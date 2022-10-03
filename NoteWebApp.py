@@ -26,6 +26,22 @@ def create_note(inputData):
 	dbconn.commit()
 	return "done"
 
+#Get a user in db.
+def get_user(inputData, args=(), one=True):
+	dbconn=get_db()
+	cur=dbconn.cursor()
+	result=cur.execute(''' select * from users where uname="?" ''', inputData).fetchone()
+	dbconn.commit()
+	return (result)
+
+#Creates a user in db.
+def create_user(inputData):
+	dbconn=get_db()
+	cur = dbconn.cursor()
+	cur.execute(''' insert into users (uname,password,name) values(?,?,?) ''', inputData)
+	dbconn.commit()
+	return "done"
+
 #Update a note in db.
 def update_note(inputData, args=(), one=False):
 	dbconn=get_db()
@@ -34,7 +50,7 @@ def update_note(inputData, args=(), one=False):
 	dbconn.commit()
 	return "done"
 
-#Update a note in db.
+#Get a note in db.
 def get_note(inputData, args=(), one=False):
 	dbconn=get_db()
 	cur=dbconn.cursor()
@@ -51,10 +67,20 @@ def delete_note(inputData, args=(), one=False):
 	return (result)
 
 #Contains base HTML used on all pages.
-htmlstart='<!DOCTYPE html><html><head><title>Notes in the Cloud</title></head><body>'
+htmlstart='<!DOCTYPE html><html><head><title>Notes in the Cloud</title><style>*{margin:0;padding:0;}#banner{background:#222;height:5vh;color:#ddd;font-size:2vh;}#banner a{color:#ddd;}#main{display:block;background:#ddd;height:95vh;width:100vw}</style></head><body>'
 htmlend='</body></html>'
 
-noteform='<form action="/TEMPACTION" method="post"><label for="title">TEMPTITLE</label><input name="title" id="title" value=""><textarea name="note" id="note"></textarea><input type="submit" value="Create note"></form>'
+noteform='<div id="main"><form action="/TEMPACTION" method="post"><label for="title">TEMPTITLE</label><input name="title" id="title" value=""><textarea name="note" id="note"></textarea><input type="submit" value="Create note"></form></div>'
+
+#Code to generate topbanner
+def generateBanner():
+	bannercode='<div id=banner>'
+	if "uname" in session:
+		bannercode=bannercode+'User name: '+session['name']
+	else:
+		bannercode=bannercode+'<a href="/cUser">Create user</a>'
+	bannercode=bannercode+'</div>'
+	return bannercode
 
 #Frontpage
 @app.route("/")
@@ -63,21 +89,33 @@ def index():
 	if "uname" in session:
 		indexform=noteform.replace('TEMPACTION','create')
 		indexform=indexform.replace('TEMPTITLE','New Note')
-		return htmlstart+""+indexform+htmlend
+		return htmlstart+generateBanner()+indexform+htmlend
 	else:
-		return htmlstart+'<form action="/login" method="post"><table><tr><td><lable for="uname">Username:</td><td><input name="uname" id="uname"></td></tr><tr><td><lable for="pword">Password:</td><td><input name="pword" id="pword"></td></tr><tr><td></td><td><input type="submit" value="Log in"></td></tr></table></form>'+htmlend
+		return htmlstart+generateBanner()+'<div id="main"><form action="/login" method="post"><table><tr><td><lable for="uname">Username:</td><td><input name="uname" id="uname"></td></tr><tr><td><lable for="pword">Password:</td><td><input name="pword" id="pword"></td></tr><tr><td></td><td><input type="submit" value="Log in"></td></tr></table></form></div>'+htmlend
 		
 #Login
-@app.route("/login")
+@app.route("/login", methods=['POST', 'GET'])
 def login():
-    return htmlstart+""+htmlend
+	if request.method == 'POST':
+		postedUname=[request.form.get('uname')]
+		user=get_user(postedUname)
+		if user[2]==str(hash(request.form.get('pword')+"salt")):
+			session['id']=user[0]
+			session['uname']=user[1]
+			session['name']=user[3]
+	return htmlstart+generateBanner()+htmlend
+
+#Create User
+@app.route("/cUser")
+def createUser():
+    return htmlstart+generateBanner()+'<div id="main"><form action="/cUserBackend" method="post"><table><tr><td><lable for="uname">Username:</td><td><input name="uname" id="uname"></td></tr><tr><td><lable for="pword">Password:</td><td><input name="pword" id="pword"></td></tr><tr><td><lable for="pword2">Password again:</td><td><input name="pword2" id="pword2"></td></tr><tr><td></td><td><input type="submit" value="Create user"></td></tr></table></form></div>'+htmlend
 
 #Create note page
 @app.route("/note")
 def note():
     indexform=noteform.replace('TEMPACTION','create')
     indexform=indexform.replace('TEMPTITLE','New Note')
-    return htmlstart+"<p>Hello, World!</p>"+indexform+htmlend
+    return htmlstart+generateBanner()+indexform+htmlend
 
 #Show a note page
 @app.route("/note/<note_id>")
@@ -87,7 +125,23 @@ def readnote(note_id):
 	indexform=indexform.replace('TEMPTITLE','Note: ')
 	indexform=indexform.replace('id="title" value="','id="title" value="'+theNote[0][2])
 	indexform=indexform.replace('</textarea>',theNote[0][3]+'</textarea>')
-	return htmlstart+"<p>Hello, World!</p>"+indexform+htmlend
+	return htmlstart+generateBanner()+indexform+htmlend
+
+#Create a user process
+@app.route("/cUserBackend", methods=['POST', 'GET'])
+def createUserBackend():
+	print(request.form)
+	if request.method == 'POST':
+		if request.form.get('pword')==request.form.get('pword2'):
+			inputData=[request.form.get('uname'),str(hash(request.form.get('pword')+"salt")),request.form.get('uname')]
+			create_user(inputData);
+			user=get_user(request.form.get('uname'))
+			print(user)
+			session['id']=user[0]
+			session['uname']=user[1]
+			session['name']=user[3]
+			return '<p>User made</p>'
+	return "<p>Failed to make user</p>"
 
 #Create a note process
 @app.route("/create", methods=['POST', 'GET'])
