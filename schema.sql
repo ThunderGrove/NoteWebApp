@@ -13,5 +13,6 @@ CREATE TABLE notes(
     title TEXT NOT NULL,
     note TEXT NOT NULL,
 	ownerid INTEGER NOT NULL,
-	sharedSet INTEGER NOT NULL
+	key TEXT NOT NULL,
+	IV TEXT NOT NULL
 );
