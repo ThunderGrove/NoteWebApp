@@ -1,16 +1,17 @@
 function getMsgEncoding(){
-	const msgBox = document.getElementById("note").value;
-	var msg = msgBox.value;
-	var enc = new TextEncoder();
-	return enc.encode(message);
+	var msgBox=document.getElementById("note").value;
+	var msg=msgBox.value;
+	var enc=new TextEncoder();
+	return enc.encode(msg);
 }
 
 async function encode(){
 	var encoded = getMsgEncoding();
 	//iv will be needed for decryption
 	var iv = window.crypto.getRandomValues(new Uint8Array(16));
-	//alert(iv);
-	document.getElementById("iv").value = iv;
+
+	document.getElementById("iv").value=iv;
+
 	var key = await window.crypto.subtle.generateKey({
 		name: "AES-CBC",
 		length: 256
@@ -19,12 +20,13 @@ async function encode(){
 		["encrypt", "decrypt"]
 	);
 
-	const exported = await window.crypto.subtle.exportKey("raw", key);
-	const exportedKeyBuffer = new Uint8Array(exported);
+	var exported = await window.crypto.subtle.exportKey("raw", key);
+	var exportedKeyBuffer = new Uint8Array(exported);
 	document.getElementById("key").value = exportedKeyBuffer;
+
 	var result = await window.crypto.subtle.encrypt({
-		name: "AES-CBC",
-		iv: iv
+		name:"AES-CBC",
+		iv:iv
 		},
 		key,
 		encoded
@@ -32,61 +34,33 @@ async function encode(){
 	var decoder = new TextDecoder("utf-8");
 	var cipherTextRaw = decoder.decode(result);
 	var buffer = new Uint8Array(result);
-	var cipherTextArr = `${buffer}...[${result.byteLength} bytes total]`;
-	//document.getElementById("cryptTextArea").value="Krypteret besked: " + cipherTextRaw;
-	//HER KRYPTERER VI NOTETEXT
-	//document.getElementById("encodedTextArea").value="Krypteret besked: " + cipherTextArr;
-	document.getElementById("note").value=cipherTextArr;
+	document.getElementById("note").value=buffer;
 }
 
 async function decode(){
 	var msg=document.getElementById("note").value;
+	msg=msg.base64Data;
 	var key=Array.from(document.getElementById("key").value);
 	var iv=document.getElementById("iv").value;
+	iv=Array.from(iv);
+	
+	var uArray=new Uint8Array(
+		[...msg].map((char)=>char.charCodeAt(0))
+	);
+	
 
-	var result = await window.crypto.subtle.decrypt({
-		name: "AES-CBC",
-		iv: iv
-		},
+	var algorithm = {
+		name: "AES-GCM",
+		iv:iv,
+	};
+
+	var imported = await window.crypto.subtle.importKey("raw", key,"AES-GCM",true,["encrypt", "decrypt"]);
+
+	var decryptedData = await window.crypto.subtle.decrypt(
+		algorithm,
 		key,
-		msg
+		uArray
 	);
 
-	var decoder = new TextDecoder("utf-8");
-	var cipherTextRaw = decoder.decode(result);
-	var buffer = new Uint8Array(result);
-	var cipherTextArr = `${buffer}...[${result.byteLength} bytes total]`;
-	document.getElementById("note").value=cipherTextArr;
-}
-
-function getMsgEncoding(){
-  var msg = document.getElementById("note").value;
-  var enc = new TextEncoder();
-  return enc.encode(msg);
-}
-
-function encryptMsg(key){
-	var encoded = getMsgEncoding();
-	// iv will be needed for decryption
-	iv = window.crypto.getRandomValues(new Uint8Array(16));
-	return window.crypto.subtle.encrypt({
-		name: "AES-CBC",
-		iv: iv
-		},
-		key,
-		encoded
-	);
-}
-
-function decryptMsg(key){
-	var encoded = getMsgEncoding();
-	// iv will be needed for decryption
-	iv = window.crypto.getRandomValues(new Uint8Array(16));
-	return window.crypto.subtle.decrypt({
-		name: "AES-CBC",
-		iv: iv
-		},
-		key,
-		encoded
-	);
+	document.getElementById("note").value=new TextDecoder().decode(decryptedData);
 }
